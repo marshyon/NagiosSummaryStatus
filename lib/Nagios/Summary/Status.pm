@@ -503,12 +503,15 @@ sub nagios_dat_parser {
 
 =head1 NAME
 
-Nagios::Summary::Status - Creates summaries from a nagios status, host config and nagios log file storing output to CHI ( formerly Cache::Cache ) file store. 
+Nagios::Summary::Status - Creates summaries from a nagios status, host 
+config and nagios log file storing output to CHI ( formerly Cache::Cache ) 
+file store. 
 
 =head1 SYNOPSIS
 
   use Nagios::Summary::Status;
-  my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files', 'cache_expires' => '2 minutes'});
+  my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files', 
+      'cache_expires' => '2 minutes'});
   $ns->hosts_dat_parser({'file' => 'hosts.cfg'});
   $ns->status_dat_parser({'file' => 'status.dat'});
   $ns->generate_summary();
@@ -516,19 +519,23 @@ Nagios::Summary::Status - Creates summaries from a nagios status, host config an
 
 =head1 DESCRIPTION
 
-Given 3 input files, hosts.cfg, status.dat and nagios.log, summary of status and log data is produced
-and stored to a 'CHI' cache.
+Given 3 input files, hosts.cfg, status.dat and nagios.log, summary of 
+status and log data is produced and stored to a 'CHI' cache.
 
-A cache is used so that repeated calls to dump data need not require the config files to be re-parsed for a default of '2 minutes'
+A cache is used so that repeated calls to dump data need not require the 
+config files to be re-parsed for a default of '2 minutes'
 
 A dump script - see USAGE can be used to extract the time limited cache data. 
 
 =head1 USAGE
 
-The following is a dump script. In this initial release, Data::Dumper is the most usefull way to extract data from the CHI cache
+The following is a dump script. In this initial release, Data::Dumper is 
+the most usefull way to extract data from the CHI cache
 
-It is intended that new methods enabling the distribution of data via JSONP used as part of a web service will added in time. In particular,
-time based re-parse and store to cache to be triggered on expiry of the cache.
+It is intended that new methods enabling the distribution of data via 
+JSONP used as part of a web service will added in time. In particular,
+time based re-parse and store to cache to be triggered on expiry of 
+the cache.
 
 the following 'update.pl' script :
 
@@ -538,7 +545,8 @@ the following 'update.pl' script :
   use warnings;
   use Nagios::Summary::Status;
 
-  my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files2', 'cache_expires' => '2 minutes'});
+  my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files2', 
+     'cache_expires' => '2 minutes'});
   $ns->hosts_dat_parser({'file' => 'hosts.cfg'});
   $ns->status_dat_parser({'file' => 'status.dat'});
   $ns->generate_summary();
@@ -553,7 +561,8 @@ the following 'dump_cache.pl' script :
   use Nagios::Summary::Status;
   use Data::Dumper;
 
-  my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files', 'cache_expires' => '2 minutes'});
+  my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files', 
+      'cache_expires' => '2 minutes'});
   my @keys = $ns->get_cache_keys();
   my $names = join('|', @keys);
   my $name = shift;
