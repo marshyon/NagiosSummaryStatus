@@ -1,0 +1,112 @@
+
+At the very least you should be able to use this set of instructions
+to install the module...
+
+perl Makefile.PL
+make
+make test
+make install
+
+If you are on a windows box you should use 'nmake' rather than 'make'.
+
+NAME
+
+Nagios::Summary::Status - Creates summaries from a nagios status, host
+config and nagios log file storing output to CHI ( formerly Cache::Cache
+) file store.
+
+SYNOPSIS
+
+      use Nagios::Summary::Status;
+      my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files', 'cache_expires' => '2 minutes'});
+      $ns->hosts_dat_parser({'file' => 'hosts.cfg'});
+      $ns->status_dat_parser({'file' => 'status.dat'});
+      $ns->generate_summary();
+      $ns->nagios_dat_parser({'file' => 'nagios.log'});
+
+DESCRIPTION
+
+Given 3 input files, hosts.cfg, status.dat and nagios.log, summary of
+status and log data is produced and stored to a 'CHI' cache.
+
+A cache is used so that repeated calls to dump data need not require the
+config files to be re-parsed for a default of '2 minutes'
+
+A dump script - see USAGE can be used to extract the time limited cache
+data.
+
+USAGE
+
+The following is a dump script. In this initial release, Data::Dumper
+is the most usefull way to extract data from the CHI cache
+
+It is intended that new methods enabling the distribution of data via
+JSONP used as part of a web service will added in time. In particular,
+time based re-parse and store to cache to be triggered on expiry of the
+cache.
+
+the following 'update.pl' script :
+
+      #!/usr/bin/env perl
+
+      use strict;
+      use warnings;
+      use Nagios::Summary::Status;
+
+      my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files2', 'cache_expires' => '2 minutes'});
+      $ns->hosts_dat_parser({'file' => 'hosts.cfg'});
+      $ns->status_dat_parser({'file' => 'status.dat'});
+      $ns->generate_summary();
+      $ns->nagios_dat_parser({'file' => 'nagios.log'});
+
+the following 'dump_cache.pl' script :
+
+      #!/usr/bin/env perl
+
+      use strict;
+      use warnings;
+      use Nagios::Summary::Status;
+      use Data::Dumper;
+
+      my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files', 'cache_expires' => '2 minutes'});
+      my @keys = $ns->get_cache_keys();
+      my $names = join('|', @keys);
+      my $name = shift;
+      die "no cache name specified : [$names]\n" unless $name;
+      die "no cache name specified : [$names]\n" unless ($name =~ m{$names});
+      my $ref = $ns->get_from_cache({ 'name' => $name });
+
+      print Dumper($ref);
+
+output from the above will look something like :
+
+        ./dump_cache.pl 
+        no cache name specified : [nagios|hosts|status|server_service_status|summary]
+
+the five cache names are available and the following will dump 'summary'
+data:
+
+      ./update.pl ; ./dump_cache.pl summary
+
+BUGS
+SUPPORT
+AUTHOR
+
+        Jon Brookes
+        CPAN ID: JNBROOKES
+        AJBC Ltd
+        marshyon (at) gmail.com
+        http://ajbcontracts.co.uk
+
+COPYRIGHT
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+The full text of the license can be found in the LICENSE file included
+with this module.
+
+SEE ALSO
+
+    perl(1).
+
