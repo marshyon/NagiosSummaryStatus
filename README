@@ -1,16 +1,3 @@
-
-At the very least you should be able to use this set of instructions
-to install the module...
-
-perl Makefile.PL
-make
-make test
-make install
-
-If you are on a windows box you should use 'nmake' rather than 'make'.
-
-NAME
-
 Nagios::Summary::Status - Creates summaries from a nagios status, host
 config and nagios log file storing output to CHI ( formerly Cache::Cache
 ) file store.
@@ -18,7 +5,8 @@ config and nagios log file storing output to CHI ( formerly Cache::Cache
 SYNOPSIS
 
       use Nagios::Summary::Status;
-      my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files', 'cache_expires' => '2 minutes'});
+      my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files', 
+            'cache_expires' => '2 minutes'});
       $ns->hosts_dat_parser({'file' => 'hosts.cfg'});
       $ns->status_dat_parser({'file' => 'status.dat'});
       $ns->generate_summary();
@@ -53,7 +41,8 @@ the following 'update.pl' script :
       use warnings;
       use Nagios::Summary::Status;
 
-      my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files2', 'cache_expires' => '2 minutes'});
+      my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files2', 
+            'cache_expires' => '2 minutes'});
       $ns->hosts_dat_parser({'file' => 'hosts.cfg'});
       $ns->status_dat_parser({'file' => 'status.dat'});
       $ns->generate_summary();
@@ -68,7 +57,8 @@ the following 'dump_cache.pl' script :
       use Nagios::Summary::Status;
       use Data::Dumper;
 
-      my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files', 'cache_expires' => '2 minutes'});
+      my $ns = Nagios::Summary::Status->new({'cache_path' => 'my_cache_files', 
+            'cache_expires' => '2 minutes'});
       my @keys = $ns->get_cache_keys();
       my $names = join('|', @keys);
       my $name = shift;
