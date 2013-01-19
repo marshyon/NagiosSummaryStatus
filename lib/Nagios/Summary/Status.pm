@@ -8,6 +8,7 @@ use POSIX qw(strftime);
 
 has 'cache_path' => ( is => 'rw', isa => 'Any' );
 has 'cache_expires' => ( is => 'rw', isa => 'Any' );
+has 'debug' => ( is => 'rw', isa => 'Any' );
     
 sub BUILD {
     my ( $self, $p ) = @_;
@@ -16,7 +17,7 @@ sub BUILD {
     $self->{'cache_expires'} = $self->{'cache_expires'} unless $self->{'cache_expires'};
     $self->{'cache'} = CHI->new( 'driver' => 'File', 'root_dir' => $self->{'cache_path'} );
     $self->{'overall_status'} = 0;
-    $self->{'overall_acknowleged_status'} = 0;
+    $self->{'overall_acknowledged_status'} = 0;
     $self->{'summary'}                = ();
     $self->{'server_service_status'}  = ();
 }
@@ -239,7 +240,7 @@ sub generate_summary {
 sub init_summary_hash {
     my $self = shift;
     $self->{'summary'}->{'status'}      = 0;
-    $self->{'summary'}->{'acknowleged'} = 0;
+    $self->{'summary'}->{'acknowledged'} = 0;
 
     foreach my $ref ( @{ $self->{'config_hashref'}->{'host'} } ) {
         if ( $ref->{'hostgroups'} ) {
@@ -255,39 +256,47 @@ sub init_summary_hash {
 sub get_combined_status {
     my $self = shift;    
 
-    
+    # single pass of config hash, looking for hosts
     foreach my $ref ( @{ $self->{'config_hashref'}->{'host'} } ) {
 
         next unless $ref->{'host_name'};
         my @hostgroups = split( ", *", $ref->{'hostgroups'} );
-
+        
         my (
-            $combined_status,   $combined_in_error_count,
-            $acknowleged_count, $host_status_ref,
-            $service_status_ref
+            $combined_status, $combined_in_error_count, $acknowledged_count,
+            $host_status_ref, $service_status_ref
         ) = $self->get_status( { 'host' => $ref->{'host_name'} } );
 
+        if($self->{debug}) {
+            print ">>DEBUG>> host_name " . $ref->{'host_name'} . "\n";
+            print "                           combined_status [$combined_status]\n";
+            print "                    combined_in_error_count[$combined_in_error_count]\n";
+            print "                         acknowledged_count[$acknowledged_count]\n\n";
+        }
+        
         $self->{'server_service_status'}->{ $ref->{'host_name'} }->{'host_status'} =
           $host_status_ref;
         $self->{'server_service_status'}->{ $ref->{'host_name'} }->{'service_status'} =
           $service_status_ref;
 
-        $self->{'summary'}->{'acknowleged'} += $acknowleged_count if $acknowleged_count;
-        $self->{'summary'}->{'in_error_count'} += $combined_in_error_count
-          if $combined_in_error_count;
+        $self->{'summary'}->{'acknowledged'}
+            += $acknowledged_count if $acknowledged_count;
+        $self->{'summary'}->{'in_error_count'}
+            += $combined_in_error_count if $combined_in_error_count;
 
-        # update for this group combined statuses
+        # update for this host, groups of which it is a member with combined statuses
         foreach my $grp (@hostgroups) {
             if ( defined( $self->{'summary'}->{'groups'}->{$grp}->{'status'} ) ) {
                 if ( $combined_status > $self->{'summary'}->{'groups'}->{$grp}->{'status'} )
                 {
                     $self->{'summary'}->{'groups'}->{$grp}->{'status'} = $combined_status;
                 }
+                
                 $self->{'summary'}->{'groups'}->{$grp}->{'combined_in_error_count'} +=
-                  $combined_in_error_count
-                  if $combined_in_error_count;
-                $self->{'summary'}->{'groups'}->{$grp}->{'combined_acknowleged_count'} +=
-                  $acknowleged_count;
+                  $combined_in_error_count if $combined_in_error_count;
+                  
+                $self->{'summary'}->{'groups'}->{$grp}->{'combined_acknowledged_count'} +=
+                  $acknowledged_count;
             }
         }
     }
@@ -320,14 +329,15 @@ sub get_status {
     my $current_state           = 0;
     my $combined_state          = 0;
     my $combined_in_error_count = 0;
-    my $acknowleged_count       = 0;
+    my $acknowledged_count      = 0;
     my $status_hashref          = $self->status_dat;
-
+    my $acknowledged_host       = 0;
     # HOST STATUS
     my $host_status_summary = ();
     (
         $current_state,           $combined_state,
-        $combined_in_error_count, $host_status_summary
+        $combined_in_error_count, $acknowledged_host,
+        $host_status_summary
       )
       = $self->get_host_status(
         {
@@ -337,10 +347,20 @@ sub get_status {
             'combined_state' => $combined_state
         }
       );
+      
+    $acknowledged_count += $acknowledged_host
+      if $acknowledged_host;
+    if($self->{'debug'}) {
+        print ">>DEBUG>> host status >> current_state[$current_state], ";
+        print "combine_state[$combined_state], combined_in_error_count[$combined_in_error_count]\n";
+        #print "host_status_summary[$host_status_summary]\n";
+    }
 
-    # HOST SERVICE STATUS
-    my ( $acknowledged_service_count, $combined_in_error_service_count,
-        $service_status_summary )
+    # SERVICE STATUS
+    
+    #return ( $current_state, $combined_state, $acknowledged_count, \%srv_summ_hash );
+    my ( $combined_service_state, $combined_in_error_service_count,
+        $acknowledged_service_count, $service_status_summary)
       = $self->get_service_status(
         {
             'status_ref'     => $status_hashref,
@@ -349,16 +369,24 @@ sub get_status {
             'combined_state' => $combined_state
         }
       );
-    $combined_state = $combined_in_error_service_count
-      if ( $combined_in_error_service_count > $combined_state );
-    $acknowleged_count += $acknowledged_service_count
+    if($self->{'debug'}) {
+        print ">>DEBUG service status >> combined_service_state[$combined_service_state] ";
+        print "acknowledged_service_count[$acknowledged_service_count], ";
+        print "combined_in_error_service_count[$combined_in_error_service_count]\n";
+    }
+    
+    $combined_state = $combined_service_state
+      if ( $combined_service_state > $combined_state );
+      
+    $acknowledged_count += $acknowledged_service_count
       if $acknowledged_service_count;
+      
     $combined_in_error_count += $combined_in_error_service_count
       if $combined_in_error_service_count;
 
     return (
         $combined_state,    $combined_in_error_count,
-        $acknowleged_count, $host_status_summary,
+        $acknowledged_count, $host_status_summary,
         $service_status_summary
     );
 
@@ -373,13 +401,14 @@ sub get_service_status {
     my $host_name               = $p->{'host'};
     my $current_state           = $p->{'current_state'};
     my $combined_state          = $p->{'combined_state'};
-    my $acknowleged_count       = 0;
+    my $acknowledged_count      = 0;
     my $combined_in_error_count = 0;
     my %srv_summ_hash           = ();
+    
     foreach my $ref ( @{ $status_hashref->{'servicestatus'} } ) {
 
         if ( $ref->{'host_name'} eq $host_name ) {
-
+            
             my $desc = $ref->{'service_description'};
             $srv_summ_hash{$desc}->{'plugin_output'} = $ref->{'plugin_output'};
             $srv_summ_hash{$desc}->{'performance_data'} =
@@ -389,7 +418,8 @@ sub get_service_status {
             my $problem_has_been_acknowledged =
               $ref->{'problem_has_been_acknowledged'};
             if ($problem_has_been_acknowledged) {
-                $acknowleged_count++;
+                print ">>DEBUG>>[ACKNOWLEGED]\n" if $self->{'debug'};
+                $acknowledged_count++;
             }
             $srv_summ_hash{$desc}->{'problem_has_been_acknowledged'} =
               $problem_has_been_acknowledged;
@@ -410,7 +440,9 @@ sub get_service_status {
         }
 
     }
-    return ( $current_state, $combined_state, \%srv_summ_hash );
+    print ">>DEBUG>> acknowledged_count [$acknowledged_count]\n" if $self->{'debug'};
+    
+    return ( $combined_state, $combined_in_error_count, $acknowledged_count, \%srv_summ_hash );
 }
 
 sub get_host_status {
@@ -422,7 +454,7 @@ sub get_host_status {
     my $current_state           = $p->{'current_state'};
     my $combined_state          = $p->{'combined_state'};
     my %host_status             = ();
-    my $acknowleged_count       = 0;
+    my $acknowledged_count      = 0;
     my $combined_in_error_count = 0;
     my %srv_summ_hash           = ();
 
@@ -434,13 +466,14 @@ sub get_host_status {
               $ref->{'current_server_state'};
             my $problem_has_been_acknowledged =
               $ref->{'problem_has_been_acknowledged'};
+            print ">>DEBUG>> hoststatus acknowledged[$problem_has_been_acknowledged]\n" if $self->{'debug'};
             if ($problem_has_been_acknowledged) {
-                $acknowleged_count++;
+                $acknowledged_count++;
             }
             $host_status{'problem_has_been_acknowledged'} =
               $problem_has_been_acknowledged;
             if ($problem_has_been_acknowledged) {
-                $acknowleged_count++;
+                $acknowledged_count++;
             }
             $host_status{'scheduled_downtime_depth'} =
               $ref->{'scheduled_downtime_depth'};
@@ -459,9 +492,14 @@ sub get_host_status {
             last HOSTSTATUS;
         }
     }
+    if($self->{'debug'}) {
+        print ">>DEBUG>> host_status returning current_state[$current_state] combined_state[$combined_state] ";
+        print "combine_in_error_count [$combined_in_error_count] acknowledged_count[$acknowledged_count]\n";
+    }
     return (
         $current_state,           $combined_state,
-        $combined_in_error_count, \%host_status
+        $combined_in_error_count, $acknowledged_count,
+        \%host_status
     );
 }
 
